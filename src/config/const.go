@@ -2,4 +2,4 @@ package config
 
 var ReelPath = "files/reel"
 
-var ConfigDir = "files/config"
+var ConfigDir = "files/config/"

@@ -48,30 +48,44 @@ func ReadConfigFile(name string) error {
 }
 
 func SaveFiles() error {
-	// save reel
 	Reel.Mutex.RLock()
-	defer Reel.Mutex.RUnlock()
-	if err := saveFile(Reel.ProcessMap, config.ReelPath); err != nil {
-		return err
-	}
 	//save configs
 	for key, value := range Reel.ProcessMap {
 		if value == REFRESH {
 			ConfigMap[key].Mutex.RLock()
 			saveFile(ConfigMap[key].Configs, config.ConfigDir+key)
 			ConfigMap[key].Mutex.RUnlock()
+			Reel.ProcessMap[key] = NO_CHANGE
 		}
 		if value == NEW {
+			//新增process记录
+			//需要判断是否有config更改
+			Reel.ProcessMap[key] = NO_CHANGE
 			createFile(config.ConfigDir + key)
-			ConfigMap[key].Mutex.RLock()
-			saveFile(ConfigMap[key].Configs, config.ConfigDir+key)
-			ConfigMap[key].Mutex.RUnlock()
-		}
-		if value == DELETE {
-			if err := deleteFile(config.ConfigDir + key); err != nil {
-				return nil
+			configs, exist := ConfigMap[key]
+			if exist {
+				ConfigMap[key].Mutex.RLock()
+				saveFile(configs.Configs, config.ConfigDir+key)
+				ConfigMap[key].Mutex.RUnlock()
 			}
 		}
+		if value == DELETE {
+			if _, err := os.Open(config.ConfigDir + key); err != nil && os.IsNotExist(err) {
+				delete(Reel.ProcessMap, key)
+				continue
+			}
+			if err := deleteFile(config.ConfigDir + key); err != nil {
+				return err
+			}
+			delete(Reel.ProcessMap, key)
+		}
+	}
+	Reel.Mutex.RUnlock()
+	// save reel
+	Reel.Mutex.Lock()
+	defer Reel.Mutex.Unlock()
+	if err := saveFile(Reel.ProcessMap, config.ReelPath); err != nil {
+		return err
 	}
 	return nil
 }
